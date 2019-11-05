@@ -640,6 +640,7 @@ function nw_create_pd_window_menus(gui, w) {
         minit(m.put.number, { enabled: false });
         minit(m.put.symbol, { enabled: false });
         minit(m.put.comment, { enabled: false });
+        minit(m.put.dropdown, { enabled: false });
         minit(m.put.bang, { enabled: false });
         minit(m.put.toggle, { enabled: false });
         minit(m.put.number2, { enabled: false });
@@ -742,6 +743,8 @@ function post_startup_messages() {
     // These will be the first messages printed to the main Pd window.
     // Later let's use a link to the docs for new users.
     pdgui.post("Welcome to Purr Data");
+    // Report the nw.js version that we're using.
+    pdgui.post("nw.js version " + process.versions["nw"]);
     // Warn the user if the font sizes aren't optimal. Font sizes which
     // aren't optimal result in extra space at the end of object/message
     // boxes

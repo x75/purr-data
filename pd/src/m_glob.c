@@ -31,6 +31,7 @@ void glob_midi_dialog(t_pd *dummy, t_symbol *s, int argc, t_atom *argv);
 void glob_midi_setapi(t_pd *dummy, t_floatarg f);
 void glob_start_path_dialog(t_pd *dummy, t_floatarg flongform);
 void glob_path_dialog(t_pd *dummy, t_symbol *s, int argc, t_atom *argv);
+void glob_addtopath(t_pd *dummy, t_symbol *path, t_float saveit);
 void glob_start_startup_dialog(t_pd *dummy, t_floatarg flongform);
 void glob_startup_dialog(t_pd *dummy, t_symbol *s, int argc, t_atom *argv);
 void glob_ping(t_pd *dummy);
@@ -75,21 +76,30 @@ static void glob_perf(t_pd *dummy, float f)
     sys_perf = (f != 0);
 }
 
-extern int sys_zoom, sys_browser_doc, sys_browser_path, sys_browser_init;
+extern int sys_zoom, sys_browser_doc, sys_browser_path, sys_browser_init,
+    sys_autopatch_yoffset;
 extern t_symbol *sys_gui_preset;
-static void glob_gui_prefs(t_pd *dummy, t_symbol *s, float f, float f2, float f3, float f4)
+static void glob_gui_prefs(t_pd *dummy, t_symbol *s, int argc, t_atom *argv)
 {
-    sys_gui_preset = s;
-    sys_zoom = !!(int)f;
-    sys_browser_doc = !!(int)f2;
-    sys_browser_path = !!(int)f3;
-    sys_browser_init = !!(int)f4;
+    sys_gui_preset = atom_getsymbolarg(0, argc--, argv++);
+    sys_zoom = !!atom_getintarg(0, argc--, argv++);
+    sys_browser_doc = !!atom_getintarg(0, argc--, argv++);
+    sys_browser_path = !!atom_getintarg(0, argc--, argv++);
+    sys_browser_init = !!atom_getintarg(0, argc--, argv++);
+    sys_autopatch_yoffset = atom_getintarg(0, argc--, argv++);
 }
 
 /* just the gui-preset, the save-zoom toggle and various help browser options for now */
 static void glob_gui_properties(t_pd *dummy)
 {
-    gui_vmess("gui_gui_properties", "xsiiii", 0, sys_gui_preset->s_name, sys_zoom, sys_browser_doc, sys_browser_path, sys_browser_init);
+    gui_vmess("gui_gui_properties", "xsiiiii",
+        dummy,
+        sys_gui_preset->s_name,
+        sys_zoom,
+        sys_browser_doc,
+        sys_browser_path,
+        sys_browser_init,
+        sys_autopatch_yoffset);
 }
 
 // ths one lives inside g_editor so that it can access the clipboard
@@ -159,6 +169,8 @@ void glob_init(void)
         gensym("start-path-dialog"), 0);
     class_addmethod(glob_pdobject, (t_method)glob_path_dialog,
         gensym("path-dialog"), A_GIMME, 0);
+    class_addmethod(glob_pdobject, (t_method)glob_addtopath,
+        gensym("add-to-path"), A_SYMBOL, A_DEFFLOAT, 0);
     class_addmethod(glob_pdobject, (t_method)glob_start_startup_dialog,
         gensym("start-startup-dialog"), 0);
     class_addmethod(glob_pdobject, (t_method)glob_startup_dialog,
@@ -175,7 +187,7 @@ void glob_init(void)
     class_addmethod(glob_pdobject, (t_method)glob_clipboard_text,
         gensym("clipboardtext"), A_FLOAT, 0);
     class_addmethod(glob_pdobject, (t_method)glob_gui_prefs,
-        gensym("gui-prefs"), A_SYMBOL, A_FLOAT, A_FLOAT, A_FLOAT, A_FLOAT, 0);
+        gensym("gui-prefs"), A_GIMME, 0);
     class_addmethod(glob_pdobject, (t_method)glob_gui_properties,
         gensym("gui-properties"), 0);
     class_addmethod(glob_pdobject, (t_method)glob_recent_files,

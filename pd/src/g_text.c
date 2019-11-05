@@ -262,6 +262,28 @@ static void canvas_objtext(t_glist *gl, int xpix, int ypix,
     }
 }
 
+
+extern int sys_autopatch_yoffset;
+static int get_autopatch_yoffset(t_canvas *x)
+{
+    if (sys_autopatch_yoffset)
+        return sys_autopatch_yoffset;
+    else
+    {
+        int fontsize = glist_getfont(x);
+        switch (fontsize)
+        {
+        case 8: return 8;
+        case 10: return 8;
+        case 12: return 9;
+        case 16: return 10;
+        case 24: return 13;
+        case 36: return 18;
+        }
+        return 10;
+    }
+}
+
 extern int sys_noautopatch;
 extern t_gobj *glist_nth(t_glist *x, int n);
 extern int glist_getindex(t_glist *x, t_gobj *y);
@@ -288,21 +310,26 @@ void canvas_howputnew(t_canvas *x, int *connectp, int *xpixp, int *ypixp,
     {
         t_gobj *g, *selected = x->gl_editor->e_selection->sel_what;
         t_text *t = (t_text *)selected;
-        // if selected object has not yet been activated we need to recreate it first
+        // if selected object has not yet been activated we need to
+        // recreate it first
         if (pd_class(&t->te_pd) == text_class && t->te_type != T_TEXT)
         {
-            glist_noselect(x); // we do this to explicitly activate object
-            glist_select(x, glist_nth(x, glist_getindex(x, 0)-1)); // then reselect it
+            // we do this to explicitly activate object...
+            glist_noselect(x);
+            // then reselect it
+            glist_select(x, glist_nth(x, glist_getindex(x, 0)-1));
             selected = x->gl_editor->e_selection->sel_what;
         }
         for (g = x->gl_list, nobj = 0; g; g = g->g_next, nobj++)
+        {
             if (g == selected)
             {
                 gobj_getrect(g, x, &x1, &y1, &x2, &y2);
                 indx = nobj;
                 *xpixp = x1;
-                *ypixp = y2 + 5;
+                *ypixp = y2 + get_autopatch_yoffset(x);
             }
+        }
         glist_noselect(x);
             /* search back for 'selected' and if it isn't on the list, 
                 plan just to connect from the last item on the list. */
@@ -356,7 +383,7 @@ void canvas_obj(t_glist *gl, t_symbol *s, int argc, t_atom *argv)
         post("unable to create stub object in closed canvas!");
     else
     {
-            /* interactively create new obect */
+            /* interactively create new object */
         t_binbuf *b = binbuf_new();
         int connectme, xpix, ypix, indx, nobj;
         canvas_howputnew(gl, &connectme, &xpix, &ypix, &indx, &nobj);
@@ -442,7 +469,7 @@ void canvas_iemguis(t_glist *gl, t_symbol *guiobjname)
     t_binbuf *b = binbuf_new();
     //int xpix, ypix;
 
-    if(!strcmp(guiobjname->s_name, "cnv"))
+    if (!strcmp(guiobjname->s_name, "cnv"))
         glist_noselect(gl);
 
     int connectme, xpix, ypix, indx, nobj;
@@ -453,11 +480,11 @@ void canvas_iemguis(t_glist *gl, t_symbol *guiobjname)
        in case of autopatch
     if (connectme)
     {
-        if(!strcmp(guiobjname->s_name, "hsl"))
+        if (!strcmp(guiobjname->s_name, "hsl"))
             xpix = xpix + 3;
-        else if(!strcmp(guiobjname->s_name, "vsl"))
+        else if (!strcmp(guiobjname->s_name, "vsl"))
             ypix = ypix + 2;
-        else if(!strcmp(guiobjname->s_name, "vu"))
+        else if (!strcmp(guiobjname->s_name, "vu"))
         {
             xpix = xpix + 1;
             ypix = ypix + 2;
@@ -2159,6 +2186,7 @@ void text_save(t_gobj *z, t_binbuf *b)
 {
     //fprintf(stderr, "text_save\n");
     t_text *x = (t_text *)z;
+    int savedacanvas = 0;
     if (x->te_type == T_OBJECT)
     {
             /* if we have a "saveto" method, and if we don't happen to be
@@ -2172,6 +2200,7 @@ void text_save(t_gobj *z, t_binbuf *b)
             mess1(&x->te_pd, gensym("saveto"), b);
             binbuf_addv(b, "ssii", gensym("#X"), gensym("restore"),
                 (int)x->te_xpix, (int)x->te_ypix);
+            savedacanvas = 1;
         }
         else    /* otherwise just save the text */
         {
@@ -2231,7 +2260,7 @@ void text_save(t_gobj *z, t_binbuf *b)
         for (i = 0; i < natom; i++)
         {
             t_symbol *s;
-            if(a[i].a_type == A_SYMBOL)
+            if (a[i].a_type == A_SYMBOL)
             {
                 //fprintf(stderr,"%d is a symbol\n", i);
                 s = a[i].a_w.w_symbol;
@@ -2241,7 +2270,7 @@ void text_save(t_gobj *z, t_binbuf *b)
                     char *c;
                     for(c = s->s_name; c != NULL && *c != '\0'; c++)
                     {
-                        if(*c == '\n')
+                        if (*c == '\n')
                         {
                             *c = '\v';
                             //fprintf(stderr,"n->v\n");
@@ -2256,7 +2285,12 @@ void text_save(t_gobj *z, t_binbuf *b)
         binbuf_addbinbuf(b, x->te_binbuf);
     }
     if (x->te_width)
-        binbuf_addv(b, ",si", gensym("f"), (int)x->te_width);
+    {
+        if (savedacanvas)
+            binbuf_addv(b, ";ssi", gensym("#X"), gensym("f"), (int)x->te_width);
+        else
+            binbuf_addv(b, ",si", gensym("f"), (int)x->te_width);
+    }
     binbuf_addv(b, ";");
 }
 

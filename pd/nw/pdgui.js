@@ -357,11 +357,12 @@ var pd_myversion,    // Pd version string
 // Keycode vs Charcode: A Primer
 // -----------------------------
 // * keycode is a unique number assigned to a physical key on the keyboard
+// * keycode is device dependent
 // * charcode is the ASCII character (printable or otherwise) that gets output
 //     when you depress a particular key
 // * keydown and keyup events report keycodes but not charcodes
 // * keypress events report charcodes but not keycodes
-// * keypress events do _not_ report non-ASCII chars like arrow keys,
+// * keypress events do _not_ fire for non-printing chars like arrow keys,
 //     Alt keypress, Ctrl, (possibly) the keypad Delete key, and others
 // * in Pd, we want to send ASCII codes + arrow keys et al to Pd for
 //     both keydown and keyup events
@@ -369,13 +370,13 @@ var pd_myversion,    // Pd version string
 //       1) keydown
 //       2) keypress
 //       3) keyup
-// Therefore...
-// * solution #1: we check for non-ASCII keycodes like arrow keys inside
-//     the keydown event
-// * solution #2: in the keypress event, we map the charcode to the
-//     last keydown keycode we received
-// * solution #3: on keyup, we use the keycode to look up the corresponding
-//     charcode, and send the charcode on to Pd
+// Therefore are solution is:
+// 1. We check for non-printable keycodes like arrow keys inside
+//    the keydown event.
+// 2. In the keypress event, we map the charcode to the
+//    last keydown keycode we received.
+// 3. On keyup, we use the keycode to look up the corresponding
+//    charcode, and send the charcode on to Pd
 var pd_keymap = {}; // to iteratively map keydown/keyup keys
                     // to keypress char codes
 
@@ -408,163 +409,183 @@ function cmd_or_ctrl_key(evt) {
 
 exports.cmd_or_ctrl_key = cmd_or_ctrl_key;
 
-var last_keydown = "";
+(function () {
 
-exports.keydown = function(cid, evt) {
-    var key_code = evt.keyCode,
-        hack = null, // hack for unprintable ascii codes
-        cmd_or_ctrl
-    switch(key_code) {
-        case 8: // backspace
-        case 9:
-        case 10:
-        case 27:
-        //case 32:
-        case 127: hack = key_code; break;
-        case 46: hack = 127; break; // some platforms report 46 for Delete
-        case 37: hack = add_keymods("Left", evt); break;
-        case 38: hack = add_keymods("Up", evt); break;
-        case 39: hack = add_keymods("Right", evt); break;
-        case 40: hack = add_keymods("Down", evt); break;
-        case 33: hack = add_keymods("Prior", evt); break;
-        case 34: hack = add_keymods("Next", evt); break;
-        case 35: hack = add_keymods("End", evt); break;
-        case 36: hack = add_keymods("Home", evt); break;
+    var last_keydown = "";
+    var keydown_repeat = 0;
 
-        // These may be different on Safari...
-        case 112: hack = add_keymods("F1", evt); break;
-        case 113: hack = add_keymods("F2", evt); break;
-        case 114: hack = add_keymods("F3", evt); break;
-        case 115: hack = add_keymods("F4", evt); break;
-        case 116: hack = add_keymods("F5", evt); break;
-        case 117: hack = add_keymods("F6", evt); break;
-        case 118: hack = add_keymods("F7", evt); break;
-        case 119: hack = add_keymods("F8", evt); break;
-        case 120: hack = add_keymods("F9", evt); break;
-        case 121: hack = add_keymods("F10", evt); break;
-        case 122: hack = add_keymods("F11", evt); break;
-        case 123: hack = add_keymods("F12", evt); break;
+    exports.keydown = function(cid, evt) {
+        var key_code = evt.keyCode,
+            hack = null, // hack for non-printable ascii codes
+            cmd_or_ctrl
+        switch(key_code) {
+            case 8: // backspace
+            case 9:
+            case 10:
+            case 27:
+            //case 32:
+            case 127: hack = key_code; break;
+            case 46: hack = 127; break; // some platforms report 46 for Delete
+            case 37: hack = add_keymods("Left", evt); break;
+            case 38: hack = add_keymods("Up", evt); break;
+            case 39: hack = add_keymods("Right", evt); break;
+            case 40: hack = add_keymods("Down", evt); break;
+            case 33: hack = add_keymods("Prior", evt); break;
+            case 34: hack = add_keymods("Next", evt); break;
+            case 35: hack = add_keymods("End", evt); break;
+            case 36: hack = add_keymods("Home", evt); break;
 
-        // Handle weird behavior for clipboard shortcuts
-        // Which don't fire a keypress for some odd reason
+            // These may be different on Safari...
+            case 112: hack = add_keymods("F1", evt); break;
+            case 113: hack = add_keymods("F2", evt); break;
+            case 114: hack = add_keymods("F3", evt); break;
+            case 115: hack = add_keymods("F4", evt); break;
+            case 116: hack = add_keymods("F5", evt); break;
+            case 117: hack = add_keymods("F6", evt); break;
+            case 118: hack = add_keymods("F7", evt); break;
+            case 119: hack = add_keymods("F8", evt); break;
+            case 120: hack = add_keymods("F9", evt); break;
+            case 121: hack = add_keymods("F10", evt); break;
+            case 122: hack = add_keymods("F11", evt); break;
+            case 123: hack = add_keymods("F12", evt); break;
 
-        case 65:
-            if (cmd_or_ctrl_key(evt)) { // ctrl-a
-                // This is handled in the nwjs menu, but we
-                // add a way to toggle the window menubar
-                // the following command should be uncommented...
-                //pdsend(name, "selectall");
-                hack = 0; // not sure what to report here...
+            // Handle weird behavior for clipboard shortcuts
+            // Which don't fire a keypress for some odd reason
+
+            case 65:
+                if (cmd_or_ctrl_key(evt)) { // ctrl-a
+                    // This is handled in the nwjs menu, but we
+                    // add a way to toggle the window menubar
+                    // the following command should be uncommented...
+                    //pdsend(name, "selectall");
+                    hack = 0; // not sure what to report here...
+                }
+                break;
+            case 88:
+                if (cmd_or_ctrl_key(evt)) { // ctrl-x
+                    // This is handled in the nwjs menubar. If we
+                    // add a way to toggle the menubar it will be
+                    // handled with the "cut" DOM listener, so we
+                    // can probably remove this code...
+                    //pdsend(name, "cut");
+                    hack = 0; // not sure what to report here...
+                }
+                break;
+            case 67:
+                if (cmd_or_ctrl_key(evt)) { // ctrl-c
+                    // Handled in nwjs menubar (see above)
+                    //pdsend(name, "copy");
+                    hack = 0; // not sure what to report here...
+                }
+                break;
+            case 86:
+                if (cmd_or_ctrl_key(evt)) { // ctrl-v
+                    // We also use "cut" and "copy" DOM event handlers
+                    // and leave this code in case we need to change
+                    // tactics for some reason.
+                    //pdsend(name, "paste");
+                    hack = 0; // not sure what to report here...
+                }
+                break;
+            case 90:
+                if (cmd_or_ctrl_key(evt)) { // ctrl-z undo/redo
+                    // We have to catch undo and redo here.
+                    // undo and redo have nw.js menu item shortcuts,
+                    // and those shortcuts don't behave consistently
+                    // across platforms:
+                    // Gnu/Linux: key events for the shortcut do not
+                    //   propogate down to the DOM
+                    // OSX: key events for the shortcut _do_ propogate
+                    //   down to the DOM
+                    // Windows: not sure...
+
+                    // Solution-- let the menu item shortcuts handle
+                    // undo/redo functionality, and do nothing here...
+                    //if (evt.shiftKey) {
+                    //    pdsend(name, "redo");
+                    //} else {
+                    //    pdsend(name, "undo");
+                    //}
+                }
+                break;
+
+            // Need to handle Control key, Alt
+
+            case 16: hack = "Shift"; break;
+            case 17: hack = "Control"; break;
+            case 18: hack = "Alt"; break;
+
+            // keycode 55 = 7 key (shifted = '/' on German keyboards)
+            case 55:
+                if (cmd_or_ctrl_key(evt)) {
+                    evt.preventDefault();
+                    pdsend("pd dsp 1");
+                }
+                break;
+
+        }
+        if (hack !== null) {
+            // To match Pd Vanilla behavior, fake a keyup if this
+            // is an auto-repeating key
+            if (evt.repeat) {
+                canvas_sendkey(cid, 0, evt, hack, 1);
             }
-            break;
-        case 88:
-            if (cmd_or_ctrl_key(evt)) { // ctrl-x
-                // This is handled in the nwjs menubar. If we
-                // add a way to toggle the menubar it will be
-                // handled with the "cut" DOM listener, so we
-                // can probably remove this code...
-                //pdsend(name, "cut");
-                hack = 0; // not sure what to report here...
+            canvas_sendkey(cid, 1, evt, hack, evt.repeat);
+            set_keymap(key_code, hack);
+        }
+
+        //post("keydown time: keycode is " + evt.keyCode);
+        last_keydown = evt.keyCode;
+        keydown_repeat = evt.repeat;
+        //evt.stopPropagation();
+        //evt.preventDefault();
+    };
+
+    exports.keypress = function(cid, evt) {
+        // For some reasons <ctrl-e> registers a keypress with
+        // charCode of 5. We filter that out here so it doesn't
+        // cause trouble when toggling editmode.
+        // Also, we're capturing <ctrl-or-cmd-Enter> in the "Edit"
+        // menu item "reselect", so we filter it out here as well.
+        // (That may change once we find a more flexible way of
+        // handling keyboard shortcuts
+        if (evt.charCode !== 5 &&
+              (!cmd_or_ctrl_key(evt) || evt.charCode !== 10)) {
+            // To match Pd Vanilla behavior, fake a keyup if this
+            // is an auto-repeating key
+            if (keydown_repeat) {
+                canvas_sendkey(cid, 0, evt, evt.charCode, 1);
             }
-            break;
-        case 67:
-            if (cmd_or_ctrl_key(evt)) { // ctrl-c
-                // Handled in nwjs menubar (see above)
-                //pdsend(name, "copy");
-                hack = 0; // not sure what to report here...
-            }
-            break;
-        case 86:
-            if (cmd_or_ctrl_key(evt)) { // ctrl-v
-                // We also use "cut" and "copy" DOM event handlers
-                // and leave this code in case we need to change
-                // tactics for some reason.
-                //pdsend(name, "paste");
-                hack = 0; // not sure what to report here...
-            }
-            break;
-        case 90:
-            if (cmd_or_ctrl_key(evt)) { // ctrl-z undo/redo
-                // We have to catch undo and redo here.
-                // undo and redo have nw.js menu item shortcuts,
-                // and those shortcuts don't behave consistently
-                // across platforms:
-                // Gnu/Linux: key events for the shortcut do not
-                //   propogate down to the DOM
-                // OSX: key events for the shortcut _do_ propogate
-                //   down to the DOM
-                // Windows: not sure...
+            canvas_sendkey(cid, 1, evt, evt.charCode,
+                keydown_repeat);
+            set_keymap(last_keydown, evt.charCode,
+                keydown_repeat);
+        }
+        //post("keypress time: charcode is " + evt.charCode);
+        // Don't do things like scrolling on space, arrow keys, etc.
+    };
 
-                // Solution-- let the menu item shortcuts handle
-                // undo/redo functionality, and do nothing here...
-                //if (evt.shiftKey) {
-                //    pdsend(name, "redo");
-                //} else {
-                //    pdsend(name, "undo");
-                //}
-            }
-            break;
+    exports.keyup = function(cid, evt) {
+        var my_char_code = get_char_code(evt.keyCode);
+        // Sometimes we don't have char_code. For example, the
+        // nw menu doesn't propogate shortcut events, so we don't get
+        // to map a charcode on keydown/keypress. In those cases we'll
+        // get null, so we check for that here...
 
-        // Need to handle Control key, Alt
+        // Also, HTML5 keyup event appears not to ever trigger on autorepeat.
+        // So we always send a zero here and fake the autorepeat above to
+        // maintain consistency with Pd Vanilla.
+        if (my_char_code) {
+            canvas_sendkey(cid, 0, evt, my_char_code, 0);
+        }
+        // This can probably be removed
+        //if (cmd_or_ctrl_key(evt) &&
+        //      (evt.keyCode === 13 || evt.keyCode === 10)) {
+        //    pdgui.pdsend(name, "reselect");
+        //}
+    };
 
-        case 16: hack = "Shift"; break;
-        case 17: hack = "Control"; break;
-        case 18: hack = "Alt"; break;
-
-        // keycode 55 = 7 key (shifted = '/' on German keyboards)
-        case 55:
-            if (cmd_or_ctrl_key(evt)) {
-                evt.preventDefault();
-                pdsend("pd dsp 1");
-            }
-            break;
-
-    }
-    if (hack !== null) {
-        canvas_sendkey(cid, 1, evt, hack, evt.repeat);
-        set_keymap(key_code, hack);
-    }
-
-    //post("keydown time: keycode is " + evt.keyCode);
-    last_keydown = evt.keyCode;
-    //evt.stopPropagation();
-    //evt.preventDefault();
-};
-
-exports.keypress = function(cid, evt) {
-    // For some reasons <ctrl-e> registers a keypress with
-    // charCode of 5. We filter that out here so it doesn't
-    // cause trouble when toggling editmode.
-    // Also, we're capturing <ctrl-or-cmd-Enter> in the "Edit"
-    // menu item "reselect", so we filter it out here as well.
-    // (That may change once we find a more flexible way of
-    // handling keyboard shortcuts
-    if (evt.charCode !== 5 &&
-          (!cmd_or_ctrl_key(evt) || evt.charCode !== 10)) {
-        canvas_sendkey(cid, 1, evt, evt.charCode,
-            evt.repeat);
-        set_keymap(last_keydown, evt.charCode,
-            evt.repeat);
-    }
-    //post("keypress time: charcode is " + evt.charCode);
-    // Don't do things like scrolling on space, arrow keys, etc.
-};
-
-exports.keyup = function(cid, evt) {
-    var my_char_code = get_char_code(evt.keyCode);
-    // Sometimes we don't have char_code. For example, the
-    // nw menu doesn't propogate shortcut events, so we don't get
-    // to map a charcode on keydown/keypress. In those cases we'll
-    // get null, so we check for that here...
-    if (my_char_code) {
-        canvas_sendkey(cid, 0, evt, my_char_code, evt.repeat);
-    }
-    // This can probably be removed
-    //if (cmd_or_ctrl_key(evt) &&
-    //      (evt.keyCode === 13 || evt.keyCode === 10)) {
-    //    pdgui.pdsend(name, "reselect");
-    //}
-};
+})();
 
     // Hard-coded Pd-l2ork font metrics
 /*
@@ -1058,7 +1079,7 @@ function canvas_menuclose_callback(cid_for_dialog, cid, force) {
         w.canvas_events.close_without_saving(cid, force);
     };
     cancel_button.onclick = function() {
-        w.close_save_dialog();
+        w.canvas_events.close_save_dialog();
         w.canvas_events[w.canvas_events.get_previous_state()]();
     }
 
@@ -1472,10 +1493,17 @@ function gui_canvas_cursor(cid, pd_event_type) {
             case "cursor_editmode_resize":
                 c = "ew-resize";
                 break;
-            case "cursor_editmode_resize_bottom_right": c = "se-resize";
+            case "cursor_editmode_resize_bottom_right":
+                c = "se-resize";
                 break;
             case "cursor_scroll":
                 c = "all-scroll";
+                break;
+            case "cursor_editmode_resize_vert":
+                c = "ns-resize";
+                break;
+            case "cursor_editmode_move":
+                c = "move";
                 break;
         }
         patch.style.cursor = c;
@@ -1995,7 +2023,12 @@ function add_gobj_to_svg(svg, gobj) {
 
 var gui = (function() {
     var c = {}; // object to hold references to all our canvas closures
-    var last_thing; // last thing we got
+    // We store the last "thing" we fetched from the window. This is either
+    // the window itself or a "gobj". Regular old DOM elements that aren't
+    // a "gobj" container don't count. This way we can do a "get_gobj" then
+    // gang multiple element queries after it that work within our last
+    // "gobj." (Same for window.)
+    var last_thing;
     var null_fn, null_canvas;
     var create_canvas = function(cid, w) {
         var get = function(parent, sel, arg, suffix) {
@@ -2016,7 +2049,7 @@ var gui = (function() {
         return {
             append: !w ? null_fn: function(cb) {
                 var frag = w.window.document.createDocumentFragment();
-                frag = cb(frag, w.window);
+                frag = cb(frag, w.window, c[cid]);
                 last_thing.appendChild(frag);
                 return c[cid];
             },
@@ -3234,12 +3267,29 @@ function gui_iemgui_label_font(cid, tag, fontname, fontweight, fontsize) {
     });
 }
 
+function toggle_drag_handle_cursors(e, is_label, state) {
+    e.querySelector(".constrain_top_right").style.cursor =
+        state ? "ew-resize" : "";
+    e.querySelector(".constrain_bottom_right").style.cursor =
+        state ? "ns-resize" : "";
+    e.querySelector(".unconstrained").style.cursor =
+        state ? (is_label ? "move" : "se-resize") : "";
+}
+
+exports.toggle_drag_handle_cursors = toggle_drag_handle_cursors;
+
 // Show or hide little handle for dragging around iemgui labels
 function gui_iemgui_label_show_drag_handle(cid, tag, state, x, y, cnv_resize) {
     if (state !== 0) {
         gui(cid).get_gobj(tag)
-        .append(function(frag) {
-            var rect;
+        .append(function(frag, w) {
+            var g, rect, top_right, bottom_right;
+            g = create_item(cid, "g", {
+                class: (cid === tag) ? "gop_drag_handle move_handle border" :
+                    cnv_resize !== 0 ? "cnv_resize_handle border" :
+                    "label_drag_handle move_handle border",
+                transform: "matrix(1, 0, 0, 1, 0, 0)"
+            });
             // Here we use a "line" shape so that we can control its color
             // using the "border" class (for iemguis) or the "gop_rect" class
             // for the graph-on-parent rectangle anchor. In both cases the
@@ -3247,33 +3297,73 @@ function gui_iemgui_label_show_drag_handle(cid, tag, state, x, y, cnv_resize) {
             // to define than a "rect" for that case.
             rect = create_item(cid, "line", {
                 x1: x,
-                y1: y + 3,
+                y1: y,
                 x2: x,
-                y2: y + 10,
-                "stroke-width": 7,
-                class: (cid === tag) ? "gop_drag_handle move_handle gop_rect" :
-                    cnv_resize !== 0 ? "cnv_resize_handle border" :
-                    "label_drag_handle move_handle border"
+                y2: y + 14,
+                "stroke-width": 14,
+                class: "unconstrained"
             });
-            rect.classList.add("clickable_resize_handle");
-            frag.appendChild(rect);
+            g.classList.add("clickable_resize_handle");
+            top_right = create_item(cid, "rect", {
+                x: x + 1.5,
+                y: y + 0.5,
+                width: 5,
+                height: 7,
+                fill: "black",
+                "fill-opacity": "0",
+                class: "constrain_top_right"
+            });
+            bottom_right = create_item(cid, "rect", {
+                x: x - 6.5,
+                y: y + 8.5,
+                width: 7,
+                height: 5,
+                fill: "black",
+                "fill-opacity": "0",
+                class: "constrain_bottom_right"
+            });
+            g.appendChild(rect);
+            g.appendChild(top_right);
+            g.appendChild(bottom_right);
+
+            // Quick hack for cursors on mouse-over. We only add them if
+            // we're not already dragging a label or resizing an iemgui.
+            // Apparently I didn't register all these edge-case event states
+            // in canvas_events. States like "iemgui_label_drag" actually
+            // just get registered as state "none". So we just check for "none"
+            // here and assume it means we're in the middle of dragging.
+            // If not we go ahead and set our cursor styles.
+            if (w.canvas_events.get_state() != "none") {
+                toggle_drag_handle_cursors(g, cnv_resize === 0, true);
+            }
+
+            frag.appendChild(g);
             return frag;
         });
     } else {
         gui(cid).get_gobj(tag, function(e) {
-            var rect =
+            var g =
                 e.getElementsByClassName((cid === tag) ? "gop_drag_handle" :
                     cnv_resize !== 0 ? "cnv_resize_handle" :
                         "label_drag_handle")[0];
             //rect = get_item(cid, "clickable_resize_handle");
             // Need to check for null here...
-            if (rect) {
-                rect.parentNode.removeChild(rect);
+            if (g) {
+                g.parentNode.removeChild(g);
             } else {
                 post("error: couldn't delete the iemgui drag handle!");
             }
         });
     }
+}
+
+function gui_iemgui_label_displace_drag_handle(cid, tag, dx, dy) {
+    gui(cid).get_gobj(tag)
+    .q(".label_drag_handle", function(e) {
+        var t = e.transform.baseVal.getItem(0);
+        t.matrix.e += dx;
+        t.matrix.f += dy;
+    });
 }
 
 function gui_mycanvas_new(cid,tag,color,x1,y1,x2_vis,y2_vis,x2,y2) {
@@ -4152,7 +4242,8 @@ function gui_grid_point(cid, tag, x, y) {
 }
 
 // mknob from moonlib
-function gui_mknob_new(cid, tag, x, y, is_toplevel, show_in, show_out) {
+function gui_mknob_new(cid, tag, x, y, is_toplevel, show_in, show_out,
+    is_footils_knob) {
     gui(cid).get_elem("patchsvg", function(svg_elem) {
         gui_gobj_new(cid, tag, "obj", x, y, is_toplevel);
     });
@@ -4162,49 +4253,238 @@ function gui_mknob_new(cid, tag, x, y, is_toplevel, show_in, show_out) {
             class: "border" // now we can inherit the css border styles
         }),
         circle = create_item(cid, "circle", {
-            class: "circle"
+            //class: "circle"
         }),
         line = create_item(cid, "line", {
-            class: "dial"
+            //class: "dial"
         });
         frag.appendChild(border);
         frag.appendChild(circle);
+        /* An extra circle for footils/knob */
+        if (!!is_footils_knob) {
+            frag.appendChild(create_item(cid, "circle", {
+                class: "dial_frag"
+            }));
+        }
         frag.appendChild(line);
         return frag;
     });
 }
 
-function gui_configure_mknob(cid, tag, size, bg_color, fg_color) {
-    gui(cid).get_gobj(tag)
+function knob_dashes(d, len) {
+    var c = d * 3.14159;
+    return (c * len) + " " + (c * (1 - len));
+}
+
+function knob_offset(d) {
+    return d * 3.14 * -0.28;
+}
+
+function gui_configure_mknob(cid, tag, size, bg_color, fg_color,
+    is_footils_knob) {
+    var w = size,
+        h = !!is_footils_knob ? size + 5 : size;
+    var g = gui(cid).get_gobj(tag)
     .q(".border", {
-        d: ["M", 0, 0, size, 0,
-            "M", 0, size, size, size,
-            "M", 0, 0, 0, size,
-            "M", size, 0, size, size
+        d: ["M", 0, 0, w, 0,
+            "M", 0, h, w, h,
+            "M", 0, 0, 0, h,
+            "M", w, 0, w, h
            ].join(" "),
         fill: "none",
     })
-    .q(".circle", {
+    .q("circle", {
         cx: size / 2,
         cy: size / 2,
         r: size / 2,
-        fill: bg_color,
+        fill: !!is_footils_knob ? "none" : bg_color,
         stroke: "black",
-        "stroke-width": 1
+        "stroke-width": !!is_footils_knob ? 3 : 1,
+        "stroke-dasharray": !!is_footils_knob ?
+            knob_dashes(size, 0.94) : "none",
+        "stroke-dashoffset": !!is_footils_knob ? knob_offset(size) : "0"
     })
-    .q(".dial", {
+    .q("line", { // indicator
         "stroke-width": 2,
         stroke: fg_color
     });
+
+    if (!!is_footils_knob) {
+        g.q(".dial_frag", {
+            cx: size / 2,
+            cy: size / 2,
+            r: size / 2,
+            fill: "none",
+            stroke: bg_color,
+            "stroke-width": 3,
+            "stroke-dasharray": knob_dashes(size, 0.94),
+            "stroke-dashoffset": knob_offset(size)
+        });
+    }
 }
 
-function gui_turn_mknob(cid, tag, x1, y1, x2, y2) {
-    gui(cid).get_gobj(tag)
-    .q(".dial", {
+function gui_turn_mknob(cid, tag, x1, y1, x2, y2, is_footils_knob, val) {
+    var g = gui(cid).get_gobj(tag)
+    .q("line", { // indicator
         x1: x1,
         y1: y1,
         x2: x2,
         y2: y2
+    });
+    if (!!is_footils_knob) {
+        g.q(".dial_frag", {
+            "stroke-dasharray": knob_dashes(x1 * 2, val * 0.94)
+        });
+    }
+}
+
+// room_sim_2d and room_sim_3d objects from iemlib
+function gui_room_sim_new(cid, tag, x, y, w, h, is_toplevel) {
+    gui(cid).get_elem("patchsvg", function(svg_elem) {
+        gui_gobj_new(cid, tag, "obj", x, y, is_toplevel);
+    });
+    gui(cid).get_gobj(tag)
+    .append(function(frag) {
+//        frag.appendChild(line);
+        return frag;
+    });
+}
+
+function gui_room_sim_map(cid, tag, w, h, rad, head, xpix, ypix, fontsize,
+    fcol, bcol, src_array, r3d) {
+    gui(cid).get_gobj(tag, function(e) {
+        gui_text_draw_border(cid, tag, 0, 0, w, h);
+        // Set the style for the background directly... otherwise the
+        // default theme bgcolor will be used
+        e.querySelector(".border").style.fill = bcol;
+    })
+    .append(function(frag) {
+        var x1 = xpix - rad,
+            x2 = xpix + rad - 1,
+            y1 = ypix - rad,
+            y2 = ypix + rad - 1,
+            dx = -((rad * Math.sin(head * 0.0174533) + 0.49999)|0),
+            dy = -((rad * Math.cos(head * 0.0174533) + 0.49999)|0),
+            i,
+            text;
+        for (i = 0; i < src_array.length; i++) {
+            text = create_item(cid, "text", {
+                x: src_array[i][0],
+                y: src_array[i][1],
+                fill: src_array[i][2],
+                "font-size": fontsize,
+                "dominant-baseline": "middle"
+            });
+            text.textContent = (i + 1).toString();
+            frag.appendChild(text);
+        }
+        var ellipse = create_item(cid, "ellipse", {
+            cx: (x2 - x1) * 0.5 + x1,
+            cy: (y2 - y1) * 0.5 + y1,
+            rx: (x2 - x1) * 0.5,
+            ry: (y2 - y1) * 0.5,
+            "stroke-width": 1,
+            "stroke": fcol,
+            "fill": "none"
+        }),
+        ellipse2 = create_item(cid, "ellipse", {
+            // for room_sim_3d
+            cx: r3d ? (r3d[2] - r3d[0]) * 0.5 + r3d[0] : 0,
+            cy: r3d ? (r3d[3] - r3d[1]) * 0.5 + r3d[1] : 0,
+            rx: r3d ? (r3d[2] - r3d[0]) * 0.5 : 0,
+            ry: r3d ? (r3d[3] - r3d[1]) * 0.5 : 0,
+            "stroke-width": 1,
+            stroke: fcol,
+            fill: "none"
+        }),
+        line = create_item(cid, "line", {
+            x1: xpix,
+            y1: ypix,
+            x2: xpix + dx,
+            y2: ypix + dy,
+            "stroke-width": 3,
+            stroke: fcol
+        });
+        frag.appendChild(ellipse);
+        frag.appendChild(ellipse2);
+        frag.appendChild(line);
+        return frag;
+    })
+}
+
+function gui_room_sim_update_src(cid, tag, i, x, y, font_size, col) {
+    gui(cid).get_gobj(tag, function(e) {
+        var a = e.querySelectorAll("text");
+        if (a.length && i < a.length) {
+            configure_item(a[i], {
+                x: x,
+                y: y,
+                "font-size": font_size,
+                fill: col
+            });
+        }
+    });
+}
+
+function gui_room_sim_update(cid, tag, x0, y0, dx, dy, pixrad) {
+    gui(cid).get_gobj(tag)
+    .q("line", {
+        x1: x0,
+        y1: y0,
+        x2: x0 + dx,
+        y2: y0 + dy
+    })
+    .q("ellipse", {
+        rx: ((x0 + pixrad - 1) - (x0 - pixrad)) * 0.5,
+        ry: ((y0 + pixrad - 1) - (y0 - pixrad)) * 0.5,
+        cx: ((x0 + pixrad - 1) - (x0 - pixrad)) * 0.5 + (x0 - pixrad),
+        cy: ((y0 + pixrad - 1) - (y0 - pixrad)) * 0.5 + (y0 - pixrad),
+    });
+}
+
+// for room_sim_3d
+function gui_room_sim_head2(cid, tag, x1, y1, x2, y2) {
+    gui(cid).get_gobj(tag, function(e) {
+        configure_item(e.querySelectorAll("ellipse")[1], {
+            rx: (x2 - x1) * 0.5,
+            ry: (y2 - y1) * 0.5,
+            cx: (x2 - x1) * 0.5 + x1,
+            cy: (y2 - y1) * 0.5 + y1
+        });
+    });
+}
+
+function gui_room_sim_fontsize(cid, tag, i, size) {
+    gui(cid).get_gobj(tag, function(e) {
+        var i, a;
+        a = e.querySelectorAll("text");
+        if (a.length) {
+            for (i = 0; i < a.length; i++) {
+                configure_item(a[i], {
+                    "font-size": size
+                });
+            }
+        }
+    });
+}
+
+// for the dial thingy
+function gui_room_sim_colors(cid, tag, fg, bg) {
+    gui(cid).get_gobj(tag)
+    .q("ellipse", {
+        stroke: fg
+    })
+    .q("line", {
+        stroke: fg
+    })
+    .q(".border", function(e) {
+        e.style.fill = bg;
+    });
+}
+
+function gui_room_sim_erase(cid, tag) {
+    gui(cid).get_gobj(tag, function(e) {
+        e.innerHTML = "";
     });
 }
 
@@ -4973,9 +5253,13 @@ function gui_text_dialog(did, width, height, font_size) {
         font_size);
 }
 
+function dialog_raise(did) {
+    dialogwin[did].focus();
+}
+
 function gui_text_dialog_raise(did) {
     if (dialogwin[did]) {
-        dialogwin[did].focus();
+        dialog_raise(did);
     }
 }
 
@@ -5018,6 +5302,8 @@ function gui_pd_dsp(state) {
 function open_prefs() {
     if (!dialogwin["prefs"]) {
         create_window("prefs", "prefs", 370, 470, 0, 0, null);
+    } else {
+        dialog_raise("prefs");
     }
 }
 
@@ -5026,6 +5312,8 @@ exports.open_prefs = open_prefs;
 function open_search() {
     if (!dialogwin["search"]) {
         create_window("search", "search", 300, 400, 20, 20, null);
+    } else {
+        dialog_raise("search");
     }
 }
 
@@ -5126,9 +5414,11 @@ function gui_midi_properties(gfxstub, sys_indevs, sys_outdevs,
     }
 }
 
-function gui_gui_properties(dummy, name, save_zoom, browser_doc, browser_path, browser_init) {
+function gui_gui_properties(dummy, name, save_zoom, browser_doc, browser_path,
+    browser_init, autopatch_yoffset) {
     if (dialogwin["prefs"] !== null) {
-        dialogwin["prefs"].window.gui_prefs_callback(name, save_zoom, browser_doc, browser_path, browser_init);
+        dialogwin["prefs"].window.gui_prefs_callback(name, save_zoom,
+            browser_doc, browser_path, browser_init, autopatch_yoffset);
     }
 }
 

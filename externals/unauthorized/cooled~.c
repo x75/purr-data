@@ -171,7 +171,7 @@ static void cooled_update_block(t_cooled *x, t_glist *glist, int bnumber)
     int hi, i=0;
     t_float fspectrum=0.0;
     int phase=0;
-    char color[8];
+    char color[9];
 
     memset( x->x_gifdata, 0x0, x->x_height*x->x_zoom*sizeof("#FFFFFF ") );
 
@@ -259,7 +259,7 @@ static void cooled_erase_block(t_cooled *x, t_glist *glist, int sample )
 
             for ( i=0; i<x->x_zoom; i++ )
             {
-                strcpy( x->x_gifdata+i*sizeof("#FFFFFF "), strcat( COOLED_BGCOLOR, " ") );
+                strcat(strcpy( x->x_gifdata+i*sizeof("#FFFFFF "), COOLED_BGCOLOR), " ");
             }
             if ( glist_isvisible( x->x_glist ) )
                 SYS_VGUI5("COOLEDIMAGE%x put {%s} -to %d %d\n", x, x->x_gifdata,
@@ -1166,7 +1166,7 @@ static t_int *cooled_perform(t_int *w)
 
 static void cooled_dsp(t_cooled *x, t_signal **sp)
 {
-    dsp_add(cooled_perform, 6, sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, sp[0]->s_n, x);
+    dsp_add(cooled_perform, 6, sp[0]->s_vec, sp[1]->s_vec, sp[2]->s_vec, sp[3]->s_vec, (t_int)sp[0]->s_n, x);
 }
 
 /* record the cooled */

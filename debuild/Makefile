@@ -42,9 +42,13 @@ debsrc = purr-data_$(debversion).orig.tar.gz
 debdist = purr-data-$(debversion)
 
 # nw.js sdk
-nwjsver = 0.22.1
+# NOTE: arm packages need some special-casing, since they are released
+# separately, and the version numbers do not always match up.
+nwjsver = 0.24.4
 nwjspkg = nwjs-sdk-v$(nwjsver)-linux
-nwjs = $(nwjspkg)-ia32.tar.gz $(nwjspkg)-x64.tar.gz
+nwjsver_arm = 0.24.5
+nwjspkg_arm = nwjs-sdk-v$(nwjsver_arm)-linux
+nwjs = $(nwjspkg)-ia32.tar.gz $(nwjspkg)-x64.tar.gz $(nwjspkg_arm)-arm.tar.gz
 
 # Submodules (Gem, etc.). You can list them with 'make submodules'.
 #submodules = Gem externals/miXed $(addprefix l2ork_addons/, cwiid fftease3.0-32bit lyonpotpourri rtcmix-in-pd)
@@ -68,7 +72,7 @@ debchange:
 
 debclean:
 	rm -rf $(debdist)
-	rm -f purr-data_*+git*
+	rm -f purr-data_*+git* purr-data-dbgsym_*+git*
 
 deb: $(debsrc) $(addprefix debian/nwjs/, $(nwjs))
 # Unpack the source into our temporary build directory.
@@ -103,12 +107,15 @@ $(debsrc):
 	git -C .. archive --format=tar.gz --prefix=$(debdist)/ HEAD | tar xfz -
 # Grab the submodules.
 	for x in $(submodules); do (cd $(debdist) && rm -rf $$x && git -C ../../$$x archive --format=tar.gz --prefix=$$x/ HEAD | tar xfz -); done
-# Pre-generate and put s_stuff.h into the tarball (see above; the build
+# Pre-generate and put s_version.h into the tarball (see above; the build
 # version is generated using git which can't be done outside the git repo).
-	sed 's|^\(#define PD_BUILD_VERSION "\).*"|\1$(PD_BUILD_VERSION)"|' ../pd/src/s_stuff.h.in > $(debdist)/pd/src/s_stuff.h
+	sed 's|^\(#define PD_BUILD_VERSION "\).*"|\1$(PD_BUILD_VERSION)"|' ../pd/src/s_version.h.in > $(debdist)/pd/src/s_version.h
 # Create the source tarball.
 	tar cfz $(debsrc) $(debdist)
 	rm -rf $(debdist)
+
+debian/nwjs/$(nwjspkg_arm)-arm.tar.gz:
+	mkdir -p debian/nwjs &&	cd debian/nwjs && wget https://github.com/LeonardLaszlo/nw.js-armv7-binaries/releases/download/v$(nwjsver_arm)/$(notdir $@)
 
 debian/nwjs/$(nwjspkg)-%.tar.gz:
 	mkdir -p debian/nwjs &&	cd debian/nwjs && wget http://dl.nwjs.io/v$(nwjsver)/$(notdir $@)

@@ -189,7 +189,7 @@ if [ ! -d "../pd/nw/nw" ]; then
 		if [ `uname -m` == "armv7l" ]; then
 			nwjs_version="v0.17.6"
 		else
-			nwjs_version="v0.22.1"
+			nwjs_version="v0.24.4"
 		fi
 	fi
 
@@ -200,7 +200,12 @@ if [ ! -d "../pd/nw/nw" ]; then
 	nwjs_url=${nwjs_url}/$nwjs_filename
 	echo "Fetching the nwjs binary from"
 	echo "$nwjs_url"
-	wget -nv $nwjs_url
+	if ! wget -nv $nwjs_url; then
+		nwjs_url=https://dl.nwjs.io/${nwjs_version}/$nwjs_filename
+		echo "Fetching the nwjs binary from"
+		echo "$nwjs_url"
+		wget -nv $nwjs_url
+	fi
 	if [[ $os == "win" || $os == "osx" ]]; then
 		unzip $nwjs_filename
 	else
@@ -297,12 +302,13 @@ then
 		# s_stuff.h when we copy it below. XXXNOTE AG: The build seems
 		# to work just fine even when skipping all this, so why again
 		# is this needed?
-		test -f ../../pd/src/s_stuff.h || make -C .. git_version
+		test -f ../../pd/src/s_version.h || make -C .. git_version
 		cp ../../pd/src/g_all_guis.h ../../externals/build/include
 		cp ../../pd/src/g_canvas.h ../../externals/build/include
 		cp ../../pd/src/m_imp.h ../../externals/build/include
 		cp ../../pd/src/m_pd.h ../../externals/build/include
 		cp ../../pd/src/s_stuff.h ../../externals/build/include
+		cp ../../pd/src/s_version.h ../../externals/build/include
 		cp ../../pd/src/g_all_guis.h ../../externals/build/include
 		rm -rf build/
 	fi

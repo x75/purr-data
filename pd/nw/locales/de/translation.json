@@ -389,6 +389,9 @@
       "del_tt": "Lösche das ausgewählte Element"
     },
     "gui": {
+      "autopatch_yoffset_tt": "Abstand in Pixeln von der Unterseite des Objekts, mit dem das neue Objekt verbunden wird",
+      "autopatch_yoffset": "Autopatching-Abstand",
+      "autopatch_yoffset_checkbox_tt": "Aktiviere den benutzerdefinierten vertikalen Autopatching-Abstand",
       "presets": {
         "gui_preset": "GUI-Preset",
         "gui_preset_tt": "Kollektion von Patch-Farben und -Stilen",
@@ -402,7 +405,8 @@
         "solarized": "Solarized",
         "solarized_inverted": "Solarized (Inverted)",
         "extended": "Extended",
-        "c64": "C64"
+        "c64": "C64",
+        "footgun": "Fusspistole"
       },
       "zoom": {
         "save_zoom": "Speichern/Laden der Vergrößerung im Patch",
